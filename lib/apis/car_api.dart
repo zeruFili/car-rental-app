@@ -10,4 +10,15 @@ class CarApi extends BaseUrl {
       throw Exception('Failed to fetch cars: $e');
     }
   }
+
+  Future<Response> createCar(FormData data) async {
+    // Change the parameter type to FormData
+    try {
+      final response = await dio.post('cars', data: data);
+      return response; // Return the response for further handling
+    } catch (e) {
+      // Handle errors (e.g., network issues, server errors)
+      throw Exception('Failed to create car: $e');
+    }
+  }
 }
