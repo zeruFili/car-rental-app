@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:get/get.dart';
 import '../controllers/login_controller.dart';
 import '../utils/api_endpoints.dart';
-import './dashboard_page.dart';
+import './car_page.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -229,7 +229,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
 
                   if (success) {
-                    Get.offAll(() => DashboardPage());
+                    Get.offAll(() => CarRentalPage());
                   } else {
                     Get.snackbar(
                       'Login Failed',

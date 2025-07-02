@@ -3,6 +3,8 @@ import '../controllers/get_car_controller.dart';
 import '../Model/car_model.dart';
 import 'package:get/get.dart';
 import '../utils/api_endpoints.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../components/sideBars.dart';
 
 class CarRentalPage extends StatefulWidget {
   const CarRentalPage({super.key});
@@ -17,6 +19,9 @@ class _CarRentalPageState extends State<CarRentalPage> {
   String _searchQuery = '';
   String _selectedBrand = 'All';
   bool _isLoading = true;
+  bool _isAuthenticated = false;
+  String _userName = '';
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Brand data with their respective filter values
   final List<Map<String, String>> brands = [
@@ -33,6 +38,7 @@ class _CarRentalPageState extends State<CarRentalPage> {
   @override
   void initState() {
     super.initState();
+    _checkAuthentication();
     _loadCars();
     _searchController.addListener(_onSearchChanged);
   }
@@ -42,6 +48,17 @@ class _CarRentalPageState extends State<CarRentalPage> {
     _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _checkAuthentication() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final name = prefs.getString('name');
+
+    setState(() {
+      _isAuthenticated = token != null && token.isNotEmpty;
+      _userName = name ?? '';
+    });
   }
 
   void _onSearchChanged() {
@@ -86,8 +103,10 @@ class _CarRentalPageState extends State<CarRentalPage> {
     }).toList();
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: _buildAppBar(),
+      drawer: _isAuthenticated ? CustomSidebar(userName: _userName) : null,
       body: Column(
         children: [
           _buildSearchBar(),
@@ -110,6 +129,12 @@ class _CarRentalPageState extends State<CarRentalPage> {
       backgroundColor: Colors.white,
       elevation: 0,
       centerTitle: true,
+      leading: _isAuthenticated
+          ? IconButton(
+              icon: const Icon(Icons.menu, color: Color(0xFF2D3748)),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            )
+          : null,
       title: const Text(
         'Rent Car anytime',
         style: TextStyle(
@@ -119,88 +144,102 @@ class _CarRentalPageState extends State<CarRentalPage> {
         ),
       ),
       actions: [
-        PopupMenuButton<String>(
-          offset: const Offset(0, 50),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+        if (!_isAuthenticated)
+          PopupMenuButton<String>(
+            offset: const Offset(0, 50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            elevation: 8,
+            color: const Color(0xFFF8F9FA),
+            child: Container(
+              margin: const EdgeInsets.all(8),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: const Color(0xFF0A5D4A),
+                child: const Icon(Icons.person, color: Colors.white),
+              ),
+            ),
+            itemBuilder: (BuildContext context) => [
+              PopupMenuItem<String>(
+                enabled: false,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Get.toNamed(ApiEndPoints.loginEmail);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF0A5D4A),
+                            backgroundColor: Colors.white,
+                            side: const BorderSide(color: Color(0xFF0A5D4A)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text(
+                            'Sign In',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            Get.toNamed(ApiEndPoints.registerEmail);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0A5D4A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          elevation: 8,
-          color: const Color(0xFFF8F9FA), // Match page background
-          child: Container(
+        if (_isAuthenticated)
+          Container(
             margin: const EdgeInsets.all(8),
             child: CircleAvatar(
               radius: 20,
               backgroundColor: const Color(0xFF0A5D4A),
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-          ),
-          itemBuilder: (BuildContext context) => [
-            PopupMenuItem<String>(
-              enabled: false,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Sign In Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Get.toNamed(ApiEndPoints.loginEmail);
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF0A5D4A),
-                          backgroundColor: Colors.white,
-                          side: const BorderSide(color: Color(0xFF0A5D4A)),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Sign Up Button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Get.toNamed(ApiEndPoints.registerEmail);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0A5D4A),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          elevation: 0,
-                        ),
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+              child: Text(
+                _userName.isNotEmpty ? _userName[0].toUpperCase() : 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
       ],
     );
   }

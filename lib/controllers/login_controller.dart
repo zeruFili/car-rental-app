@@ -15,17 +15,24 @@ Future<bool> loginUser(String email, String password) async {
     final response = await loginApi.login(data);
 
     if (response.statusCode == 200) {
-      final String token = response.data['token'];
-      final user = response.data; // Adjusted to directly use response.data
+      final user = response.data['user']; // Access user data
+      final String accessToken =
+          response.data['accessToken']; // Get access token
+      // final String refreshToken =
+      //     response.data['refreshToken']; // Get refresh token
 
       final String name = '${user['first_name']} ${user['last_name']}';
 
       final SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('token', token);
+      // Store user info and tokens
+      await prefs.setString('token', accessToken); // Store access token
+      // await prefs.setString(
+      //     'refreshToken', refreshToken); // Store refresh token
       await prefs.setString('name', name); // Store concatenated name
       await prefs.setString('email', user['email']); // Store email
       await prefs.setString('role', user['role']);
       await prefs.setString('user_id', user['_id']);
+
       return true;
     } else {
       // Handle error
