@@ -77,6 +77,23 @@ class _CarRentalPageState extends State<CarRentalPage> {
     });
   }
 
+  Future<void> _refreshCars() async {
+    // Re-fetch car data and update authentication status
+    await _checkAuthentication();
+    await _loadCars();
+
+    // Show a brief success message
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cars refreshed successfully!'),
+          duration: Duration(seconds: 1),
+          backgroundColor: Color(0xFF0A5D4A),
+        ),
+      );
+    }
+  }
+
   void _onBrandSelected(String brand) {
     setState(() {
       _selectedBrand = brand;
@@ -107,19 +124,31 @@ class _CarRentalPageState extends State<CarRentalPage> {
       backgroundColor: const Color(0xFFF8F9FA),
       appBar: _buildAppBar(),
       drawer: _isAuthenticated ? CustomSidebar(userName: _userName) : null,
-      body: Column(
-        children: [
-          _buildSearchBar(),
-          _buildBrandSection(),
-          _buildSectionTitle('Top Rated Cars'),
-          Expanded(
-            child: _isLoading
-                ? _buildLoadingState()
-                : carController.cars.isEmpty
-                    ? _buildEmptyState()
-                    : _buildCarsList(filteredCars),
+      body: RefreshIndicator(
+        onRefresh: _refreshCars,
+        color: const Color(0xFF0A5D4A),
+        backgroundColor: Colors.white,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              _buildBrandSection(),
+              _buildSectionTitle('Top Rated Cars'),
+              _isLoading
+                  ? SizedBox(
+                      height: MediaQuery.of(context).size.height * 0.4,
+                      child: _buildLoadingState(),
+                    )
+                  : carController.cars.isEmpty
+                      ? SizedBox(
+                          height: MediaQuery.of(context).size.height * 0.4,
+                          child: _buildEmptyState(),
+                        )
+                      : _buildCarsList(filteredCars),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -449,6 +478,21 @@ class _CarRentalPageState extends State<CarRentalPage> {
               color: Colors.grey[500],
             ),
           ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: _refreshCars,
+            icon: const Icon(
+              Icons.refresh,
+              color: Color(0xFF0A5D4A),
+            ),
+            label: const Text(
+              'Pull down to refresh or tap here',
+              style: TextStyle(
+                color: Color(0xFF0A5D4A),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -456,6 +500,8 @@ class _CarRentalPageState extends State<CarRentalPage> {
 
   Widget _buildCarsList(List<Car> cars) {
     return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 20),
       itemCount: cars.length,
       itemBuilder: (context, index) {

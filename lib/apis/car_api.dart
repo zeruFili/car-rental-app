@@ -12,12 +12,18 @@ class CarApi extends BaseUrl {
   }
 
   Future<Response> createCar(FormData data) async {
-    // Change the parameter type to FormData
     try {
-      final response = await dio.post('cars', data: data);
-      return response; // Return the response for further handling
+      // Don't set Content-Type here - let the interceptor handle it
+      final response = await dio.post(
+        'cars',
+        data: data,
+        options: Options(
+          // This will prevent the interceptor from setting JSON content-type
+          contentType: 'multipart/form-data',
+        ),
+      );
+      return response;
     } catch (e) {
-      // Handle errors (e.g., network issues, server errors)
       throw Exception('Failed to create car: $e');
     }
   }

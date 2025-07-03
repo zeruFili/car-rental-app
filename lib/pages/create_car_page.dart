@@ -1,8 +1,14 @@
+import 'dart:io';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:html' as html; // For web only
+import '../controllers/get_car_controller.dart';
+import './car_page.dart'; // Import the car rental page
 
 class CreateCarPage extends StatefulWidget {
-  const CreateCarPage({super.key});
+  const CreateCarPage({Key? key}) : super(key: key);
 
   @override
   _CreateCarPageState createState() => _CreateCarPageState();
@@ -15,6 +21,11 @@ class _CreateCarPageState extends State<CreateCarPage> {
   final _yearController = TextEditingController();
   final _priceController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final CarController _carController = CarController();
+
+  List<XFile> _pickedFiles = [];
+  List<String> _webImagePaths = []; // For web previews
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -23,117 +34,219 @@ class _CreateCarPageState extends State<CreateCarPage> {
     _yearController.dispose();
     _priceController.dispose();
     _descriptionController.dispose();
+    // Clean up web image URLs
+    for (var url in _webImagePaths) {
+      html.Url.revokeObjectUrl(url);
+    }
     super.dispose();
+  }
+
+  Future<void> _pickImages() async {
+    final picker = ImagePicker();
+    final pickedFiles = await picker.pickMultiImage();
+
+    if (pickedFiles != null) {
+      setState(() {
+        _pickedFiles = pickedFiles;
+        if (kIsWeb) {
+          // Generate web preview URLs
+          _webImagePaths = [];
+          for (var file in pickedFiles) {
+            _generateWebImageUrl(file);
+          }
+        }
+      });
+    }
+  }
+
+  Future<void> _generateWebImageUrl(XFile file) async {
+    final bytes = await file.readAsBytes();
+    final blob = html.Blob([bytes]);
+    final url = html.Url.createObjectUrlFromBlob(blob);
+    setState(() {
+      _webImagePaths.add(url);
+    });
+  }
+
+  void _submitForm() async {
+    if (_formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+      try {
+        final success = await _carController.createCar(
+          make: _makeController.text,
+          model: _modelController.text,
+          year: _yearController.text,
+          pricePerDay: _priceController.text,
+          description: _descriptionController.text,
+          photos: _pickedFiles,
+        );
+
+        if (success) {
+          // Clear the form
+          _makeController.clear();
+          _modelController.clear();
+          _yearController.clear();
+          _priceController.clear();
+          _descriptionController.clear();
+          setState(() {
+            _pickedFiles = [];
+            _webImagePaths = [];
+          });
+
+          // Redirect to CarRentalPage with a fresh state
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => CarRentalPage()),
+            (Route<dynamic> route) => false,
+          );
+        } else {
+          scaffoldMessenger.showSnackBar(
+            const SnackBar(
+              content: Text('Failed to create car listing'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      } finally {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+        title: const Text('Create Car Listing'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color(0xFF2D3748)),
-          onPressed: () => Get.back(),
-        ),
-        title: const Text(
-          'Create a Car',
-          style: TextStyle(
-            color: Color(0xFF2D3748),
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Add Your Car Details',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2D3748),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Fill in the information below to list your car for rent',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-              const SizedBox(height: 32),
-              _buildTextField(
-                controller: _makeController,
-                label: 'Car Make',
-                hint: 'e.g., Toyota, BMW, Mercedes',
-                icon: Icons.directions_car,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _modelController,
-                label: 'Car Model',
-                hint: 'e.g., Camry, X5, C-Class',
-                icon: Icons.car_rental,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _yearController,
-                label: 'Year',
-                hint: 'e.g., 2023',
-                icon: Icons.calendar_today,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _priceController,
-                label: 'Price per Day (ETB)',
-                hint: 'e.g., 1500',
-                icon: Icons.attach_money,
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _descriptionController,
-                label: 'Description',
-                hint: 'Describe your car features and condition',
-                icon: Icons.description,
-                maxLines: 4,
-              ),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _submitForm,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0A5D4A),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTextField(
+                      controller: _makeController,
+                      label: 'Make',
+                      hint: 'Enter car make',
+                      icon: Icons.directions_car,
                     ),
-                  ),
-                  child: const Text(
-                    'Create Car Listing',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _modelController,
+                      label: 'Model',
+                      hint: 'Enter car model',
+                      icon: Icons.car_repair,
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _yearController,
+                      label: 'Year',
+                      hint: 'Enter manufacturing year',
+                      icon: Icons.calendar_today,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _priceController,
+                      label: 'Price per Day',
+                      hint: 'Enter rental price',
+                      icon: Icons.attach_money,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTextField(
+                      controller: _descriptionController,
+                      label: 'Description',
+                      hint: 'Enter car description',
+                      icon: Icons.description,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _pickImages,
+                      child: const Text('Select Photos'),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildImagePreview(),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Create Listing'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
+  }
+
+  Widget _buildImagePreview() {
+    if (_pickedFiles.isEmpty) {
+      return const Text('No images selected');
+    }
+
+    if (kIsWeb) {
+      return Wrap(
+        spacing: 8.0,
+        children: _webImagePaths
+            .map((path) => Image.network(
+                  path,
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
+                ))
+            .toList(),
+      );
+    } else {
+      return Wrap(
+        spacing: 8.0,
+        children: _pickedFiles
+            .map((file) => Image.network(
+                  file.path,
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
+                ))
+            .toList(),
+      );
+    }
   }
 
   Widget _buildTextField({
@@ -144,61 +257,22 @@ class _CreateCarPageState extends State<CreateCarPage> {
     TextInputType? keyboardType,
     int maxLines = 1,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Color(0xFF2D3748),
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(icon, color: const Color(0xFF9CA3AF)),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF0A5D4A)),
-            ),
-            filled: true,
-            fillColor: Colors.white,
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Please enter $label';
-            }
-            return null;
-          },
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        prefixIcon: Icon(icon),
+        border: const OutlineInputBorder(),
+      ),
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Please enter $label';
+        }
+        return null;
+      },
     );
-  }
-
-  void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // Handle form submission
-      Get.snackbar(
-        'Success',
-        'Car listing created successfully!',
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
-      Get.back();
-    }
   }
 }
